@@ -50,7 +50,7 @@ Despite feature films being the most present type of film, it has a lower audien
 Here we build our Bayesian Regression Model:
 
 ```{r}
-set.seed(123)
+set.seed(0)
 fit1 <- bas.lm(audience_score ~ feature_film + drama +
                 runtime + mpaa_rating_R + thtr_rel_year +
                 oscar_season + summer_season + imdb_rating +
