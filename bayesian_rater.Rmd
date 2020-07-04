@@ -1,0 +1,29 @@
+---
+title: "Predicting Movie Ratings"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(GGally)
+library(ggplot2)
+library(dplyr)
+library(BAS)
+library(statsr)
+
+#Read in dataset
+movie_data <- get(load("/Users/Dohyun/Downloads/movies.Rdata"))
+
+#cut unneeded columns/varibles
+movie_data <- movie_data[,-c(8:12, 19:30)]
+
+#cut out documentary films
+movie_data <- movie_data[!(movie_data$title_type == "Documentary"), ]
+movie_data
+
+```
+
+The dataset consists of 456 randomly sampled movies released between 1972 to 2014 from IMDB and Rotten Tomatoes. Since the samples were not randomly assigned, we cannot infer causality, making this an observational study rather than an experimental one.
+
+
+
