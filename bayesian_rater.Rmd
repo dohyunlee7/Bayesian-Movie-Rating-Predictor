@@ -9,21 +9,152 @@ library(GGally)
 library(ggplot2)
 library(dplyr)
 library(BAS)
-library(statsr)
 
 #Read in dataset
 movie_data <- get(load("/Users/Dohyun/Downloads/movies.Rdata"))
-
-#cut unneeded columns/varibles
-movie_data <- movie_data[,-c(8:12, 19:30)]
-
-#cut out documentary films
-movie_data <- movie_data[!(movie_data$title_type == "Documentary"), ]
 movie_data
 
 ```
 
 The dataset consists of 456 randomly sampled movies released between 1972 to 2014 from IMDB and Rotten Tomatoes. Since the samples were not randomly assigned, we cannot infer causality, making this an observational study rather than an experimental one.
 
+## Exploratory Data Analysis
+
+```{r}
+movieDF = mutate(movie_data,
+                    feature_film = ifelse(title_type == 'Feature Film', "yes", "no"),
+                    drama = ifelse(genre == 'Drama', "yes", "no"),
+                    mpaa_rating_R = ifelse(mpaa_rating == 'R', "yes", "no"),
+                    oscar_season = ifelse(thtr_rel_month %in% 10:12 ,"yes","no"),
+                    summer_season = ifelse(thtr_rel_month %in% 5:8 ,"yes","no"))
+
+#visualize the relationship between audience scores and different variables of a film
+eda <- movieDF %>% select(audience_score, feature_film, drama, mpaa_rating_R, oscar_season, summer_season)
+
+#spreads out the data visuals
+gatherDF <- gather(eda,key=varname,value=val,-audience_score)
+
+#plot the boxplots
+ggplot(data = gatherDF, aes(x=val,y=audience_score,fill=val)) + 
+  geom_boxplot() +
+  facet_grid(~varname) +
+  xlab("") + ylab("Audience Score") +
+  labs(title="Audience Score by Variable",fill="Key")
+```
+
+Despite feature films being the most present type of film, it has a lower audience score rating of around 60 while non-features have a median score of around 85. Meanwhile, every other category seems to be fairly balanced.
+
+## Bayesian Modeling
+
+Here we build our Bayesian Regression Model:
+
+```{r}
+set.seed(123)
+fit1 <- bas.lm(audience_score ~ feature_film + drama +
+                runtime + mpaa_rating_R + thtr_rel_year +
+                oscar_season + summer_season + imdb_rating +
+                imdb_num_votes + critics_score +
+                best_pic_nom + best_pic_win + best_actor_win +
+                best_actress_win + best_dir_win + top200_box,
+              data = movieDF,
+              prior = "BIC",
+              modelprior = uniform())
+fit1
+```
+
+The coefficients under each variable represent the likelihood (from 0 to 1) that it is included in the posterior model. For instance "imdb_rating" has a likelihood of 1, which means it will definitely be in included in the model. "critics_score" has a likelihood of 0.89, which tells us that it is an important variable that will play a huge part in predicting the movie rating.
+
+## Testing our Model
+
+To test our posterior model, we will use three films that isn't listed in our dataset. We'll use all-time grossing movie "Avengers: Endgame", "Venom", and "The Last Airbender".
+
+```{r}
+#Test Run 1
+grep("Avengers: Endgame", movieDF$title)
+
+#run the movie through the model
+testRun1 <- data.frame(feature_film ="yes",
+                        drama ="yes",
+                        runtime = 181,
+                        mpaa_rating_R = "no",
+                        thtr_rel_year= 2019,
+                        oscar_season ="yes",
+                        summer_season = "no",
+                        imdb_rating = 8.4,
+                        imdb_num_votes= 734914,
+                        critics_score= 94,
+                        best_pic_nom ="no",
+                        best_pic_win ="no",
+                        best_actor_win ="no",
+                        best_actress_win ="no",
+                        best_dir_win ="no",
+                        top200_box ="yes")
+
+bma_predictor =  predict(newdata = testRun1, fit1, estimator = "BMA", se.fit = TRUE)
+ci_bma = confint(bma_predictor, estimator = "BMA")
+ci_bma
+```
+
+For "Avengers: Endgame" we get a 95% confidence interval of 70 to 111, so we can expect our predicted Rotten Tomatoes audience score to fall in that range. We get a predicted score of 92 and the actual audience score is 90.
+
+```{r}
+#Test Run 2
+grep("Venom", movieDF$title)
+
+testRun2 <- data.frame(feature_film ="yes",
+                        drama ="yes",
+                        runtime = 112,
+                        mpaa_rating_R = "no",
+                        thtr_rel_year= 2018,
+                        oscar_season ="yes",
+                        summer_season = "no",
+                        imdb_rating = 6.7,
+                        imdb_num_votes= 335961,
+                        critics_score= 30,
+                        best_pic_nom ="no",
+                        best_pic_win ="no",
+                        best_actor_win ="no",
+                        best_actress_win ="no",
+                        best_dir_win ="no",
+                        top200_box ="yes")
+
+bma_predictor2 =  predict(newdata = testRun2, fit1, estimator = "BMA", se.fit = TRUE)
+ci_bma2 = confint(bma_predictor2, estimator = "BMA")
+ci_bma2
+```
+
+"Venom" is a strange one because it was a movie that critics hated but fans loved. This movie has a Rotten Tomatoes critic score of 30, but has a predicted audience score of 64. The actual audience score is 80 and falls in between our confidence interval of 44 and 84, so our model performed well with this film.
+
+```{r}
+#Test Run 3
+grep("The Last Airbender", movieDF$title)
+
+testRun3 <- data.frame(feature_film ="yes",
+                        drama ="no",
+                        runtime = 103,
+                        mpaa_rating_R = "no",
+                        thtr_rel_year= 2010,
+                        oscar_season ="no",
+                        summer_season = "yes",
+                        imdb_rating = 4.1,
+                        imdb_num_votes= 147385,
+                        critics_score= 5,
+                        best_pic_nom ="no",
+                        best_pic_win ="no",
+                        best_actor_win ="no",
+                        best_actress_win ="no",
+                        best_dir_win ="no",
+                        top200_box ="no")
+
+bma_predictor3 =  predict(newdata = testRun3, fit1, estimator = "BMA", se.fit = TRUE)
+ci_bma3 = confint(bma_predictor3, estimator = "BMA")
+ci_bma3
+```
+
+"The Last Airbender", notoriously one of the worst adaptations in film history, received a 5 on the RT critic score, and has an audience score of 30. The predicted value came out to be 24, which is still very close to the true value and since it fits into the CI of 4-43, it is fair to say that our model predicted this film's audience score quite well.
+
+## Conclusion
+
+Our Bayesian Model, under specific prior variables, predicted the Rotten Tomatoes audience score quite well -- even films that had a disparity between critic and audience ratings. Although the films I tested on had overall good results, it doesn't necessarily mean the model I used was perfect. We could get more accurate results and narrow down the confidence intervals if we use more relevant variables with higher likelihoods to fit the posterior model.
 
 
