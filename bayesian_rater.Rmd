@@ -1,11 +1,13 @@
 ---
-title: "Predicting Movie Ratings"
-output: html_document
+title: "Predicting Movie Ratings using a Bayesian Regression Model"
+author: "Dohyun Lee"
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r}
 library(tidyverse)
-library(GGally)
 library(ggplot2)
 library(dplyr)
 library(BAS)
@@ -13,12 +15,11 @@ library(BAS)
 #Read in dataset
 movie_data <- get(load("/Users/Dohyun/Downloads/movies.Rdata"))
 movie_data
-
 ```
 
 The dataset consists of 456 randomly sampled movies released between 1972 to 2014 from IMDB and Rotten Tomatoes. Since the samples were not randomly assigned, we cannot infer causality, making this an observational study rather than an experimental one.
 
-## Exploratory Data Analysis
+### Exploratory Data Analysis
 
 ```{r}
 movieDF = mutate(movie_data,
@@ -44,7 +45,7 @@ ggplot(data = gatherDF, aes(x=val,y=audience_score,fill=val)) +
 
 Despite feature films being the most present type of film, it has a lower audience score rating of around 60 while non-features have a median score of around 85. Meanwhile, every other category seems to be fairly balanced.
 
-## Bayesian Modeling
+### Bayesian Modeling
 
 Here we build our Bayesian Regression Model:
 
@@ -58,13 +59,21 @@ fit1 <- bas.lm(audience_score ~ feature_film + drama +
                 best_actress_win + best_dir_win + top200_box,
               data = movieDF,
               prior = "BIC",
+              method = "MCMC",
               modelprior = uniform())
 fit1
+
+#Checking our assumptions
+par(mfrow=c(2,2))
+plot(fit1, which=c(1, 2), ask=FALSE)
+plot(fit1, which=4, ask=FALSE, cex.lab=0.5)
 ```
 
 The coefficients under each variable represent the likelihood (from 0 to 1) that it is included in the posterior model. For instance "imdb_rating" has a likelihood of 1, which means it will definitely be in included in the model. "critics_score" has a likelihood of 0.89, which tells us that it is an important variable that will play a huge part in predicting the movie rating.
 
-## Testing our Model
+As for our assumptions, our residuals vs fitted plot (top left) data points aren't randomly, evenly scattered, which might tell us that some predictor variables are unnecessary or need further evaluation for inclusion in the study. A Markov Chain Monte Carlo (MCMC) method was used for sampling models for fitting the data because there is a lot of predictor variables in the study. The top-right graph shows the posterior probability density leveling off at 1 after approximately 3000 model combinations. The bottom-left graph shows the likelihood of each predictor variable being included in the posterior model, which "imdb_rating" and "critics_score" yielding the highest likelihoods.
+
+### Testing our Model
 
 To test our posterior model, we will use three films that isn't listed in our dataset. We'll use all-time grossing movie "Avengers: Endgame", "Venom", and "The Last Airbender".
 
@@ -95,7 +104,7 @@ ci_bma = confint(bma_predictor, estimator = "BMA")
 ci_bma
 ```
 
-For "Avengers: Endgame" we get a 95% confidence interval of 70 to 111, so we can expect our predicted Rotten Tomatoes audience score to fall in that range. We get a predicted score of 92 and the actual audience score is 90.
+For "Avengers: Endgame" we get a 95% confidence interval of 71 to 112, so we can expect our predicted Rotten Tomatoes audience score to fall in that range. We get a predicted score of 92 and the actual audience score is 90.
 
 ```{r}
 #Test Run 2
@@ -123,7 +132,7 @@ ci_bma2 = confint(bma_predictor2, estimator = "BMA")
 ci_bma2
 ```
 
-"Venom" is a strange one because it was a movie that critics hated but fans loved. This movie has a Rotten Tomatoes critic score of 30, but has a predicted audience score of 64. The actual audience score is 80 and falls in between our confidence interval of 44 and 84, so our model performed well with this film.
+"Venom" is a strange one because it was a movie that critics hated but fans loved. This movie has a Rotten Tomatoes critic score of 30, but has a predicted audience score of 64. The actual audience score is 80 and falls in between our confidence interval of 44 and 83, so our model performed well with this film.
 
 ```{r}
 #Test Run 3
@@ -151,10 +160,9 @@ ci_bma3 = confint(bma_predictor3, estimator = "BMA")
 ci_bma3
 ```
 
-"The Last Airbender", notoriously one of the worst adaptations in film history, received a 5 on the RT critic score, and has an audience score of 30. The predicted value came out to be 24, which is still very close to the true value and since it fits into the CI of 4-43, it is fair to say that our model predicted this film's audience score quite well.
+"The Last Airbender", notoriously one of the worst adaptations in film history, received a 5 on the RT critic score, and has an audience score of 30. The predicted value came out to be 24, which is still very close to the true value and since it fits into the CI of 3-43, it is fair to say that our model predicted this film's audience score quite well.
 
-## Conclusion
+### Conclusion
 
-Our Bayesian Model, under specific prior variables, predicted the Rotten Tomatoes audience score quite well -- even films that had a disparity between critic and audience ratings. Although the films I tested on had overall good results, it doesn't necessarily mean the model I used was perfect. We could get more accurate results and narrow down the confidence intervals if we use more relevant variables with higher likelihoods to fit the posterior model.
-
+Our Bayesian Model, under specific prior variables, predicted the Rotten Tomatoes audience score quite well -- even films that had a disparity between critic and audience ratings. Although the films I tested on had overall good results, it doesn't necessarily mean the model I used was perfect. We could get more accurate results and narrow down the confidence intervals if we use more relevant variables with higher likelihoods, while cutting out less relevant variables to better fit the posterior model.
 
